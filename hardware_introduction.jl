@@ -1,8 +1,6 @@
 # # What scientists must know about hardware to write fast code
 # 
-# **Find this notebook at https://github.com/jakobnissen/hardware_introduction**
-# 
-# Programming is used in many fields of science today, where individual scientists often have to write custom code for their own projects. For most scientists, however, computer science is not their field of expertise; They have learned programming by necessity. I count myself as one of them. While we may be reasonably familiar with the *software* side of programming, we rarely have even a basic understanding of how computer *hardware* impacts code performance.
+# Programming is used in many fields of science today, where individual scientists often have to write custom code for their own projects. For most scientists, however, computer science is not their field of expertise; They have learned programming by necessity. I count myself as one of them. While we may may be resonably familiar with the *software* side of programming, we rarely have even a basic understanding of how computer *hardware* impacts code performance.
 # 
 # The aim of this tutorial is to give non-professional programmers a *brief* overview of the features of modern hardware that you must understand in order to write fast code. It will be a distillation of what have learned the last few years. This tutorial will use Julia because it allows these relatively low-level considerations to be demonstrated easily in a high-level, interactive language.
 # 
@@ -27,7 +25,7 @@
 # * Tuples
 # 
 # ### This is not a tutorial on benchmarking your code
-# To write fast code *in practice*, it is necessary to profile your code to find bottlenecks where your machine spends the majority of the time. One must benchmark different functions and approaches to find the fastest in practice. Julia (and other languages) have tools for exactly this purpose, but I will not cover them here.
+# To write fast code *in practise*, it is necessary to profile your code to find bottlenecks where your machine spends the majority of the time. One must benchmark different functions and approaches to find the fastest in practise. Julia (and other languages) have tools for exactly this purpose, but I will not cover them here.
 
 # ## Content
 # 
@@ -47,10 +45,10 @@
 
 # ## Before you begin: Install packages
 
-## If you don't already have these packages installed, outcomment these lines and run it:
-## using Pkg
-## Pkg.add("BenchmarkTools")
-## Pkg.add("StaticArrays")
+## Install packages
+using Pkg
+Pkg.add("StaticArrays")
+Pkg.add("BenchmarkTools")
 
 using StaticArrays
 using BenchmarkTools
@@ -61,13 +59,13 @@ using BenchmarkTools
 # For now, we will work with a simplified mental model of a computer. Through this document, I will add more details to our model as they become relevant.
 # 
 # <br>
-# <center><font size=4>
+# <center><font size=5>
 # [CPU] ↔ [RAM] ↔ [DISK]
-# </font></center><br>
+# </font></center>
 # 
 # In this simple diagram, the arrows represent data flow in either direction. The diagram shows three important parts of a computer:
 # 
-# * The central processing unit (CPU) is a chip the size of a stamp. This is where all the computation actually occurs, the brain of the computer.
+# * The central processing usit (CPU) is a chip the size of a stamp. This is where all the computation actually occurs, the brain of the computer.
 # * Random access memory (RAM, or just "memory") is the short-term memory of the computer. This memory requires electrical power to maintain, and is lost when the computer is shut down. RAM serves as a temporary storage of data between the disk and the CPU. Much of time spent "loading" various applications and operating systems is actually spent moving data from disk to RAM and unpacking it there. A typical consumer laptop has around $10^{11}$ bits of RAM memory.
 # * The disk is a mass storage unit. This data on disk persists after power is shut down, so the disk contains the long-term memory of the computer. It is also much cheaper per gigabyte than RAM, with consumer PCs having around $10^{13}$ bits of disk space.
 
@@ -86,7 +84,7 @@ function test_file(path)
         read(file, UInt8)
     end
 end
-@time test_file("testfile")
+@time test_file("../fasta.svg")
 
 ## This test may seem weirdly constructed, but I use a Set to force cache misses to compare
 ## main RAM (and not cache) with disk.
@@ -105,13 +103,13 @@ end
 # Benchmarking this is a little tricky, because the *first* invokation will include the compilation times of both functions. And in the *second* invokation, your operating system will have stored a copy of the file (or *cached* the file) in RAM, making the file seek almost instant. To time it properly, run it once, then *change the file*, and run it again. So in fact, we should update our computer diagram:
 # 
 # <br>
-# <center><font size=4>
+# <center><font size=5>
 # [CPU] ↔ [RAM] ↔ [DISK CACHE] ↔ [DISK]
-# </font></center><br>
+# </font></center>
 # 
 # On my computer, finding a single byte in a file takes about 13 miliseconds, and finding 25,000 integers from a `Set` takes 9.5 miliseconds. So RAM is on the order of 34,000 times faster than disk.
 # 
-# When working with data too large to fit into RAM, load in the data chunk by chunk, e.g. one line at a time, and operate on that. That way, you don't need *random access* to your file and thus need to waste time on extra seeks, but only sequential access. And you *must* strive to write your program such that any input files are only read through *once*, not multiple times.
+# When working with data too large to fit into RAM, load in the data chunk by chunk, e.g. one line at a time, and operate on that. That way, you don't need *random access* to your file and thus need to waste time on extra seeks, but only sequential access. And you *must* strive to do your computation when only reading in your file *once*.
 # 
 # If you need to read a file byte by byte, for example when parsing a file, great speed improvements can be found by *buffering* the file. When  buffering, you read in larger chunks, the *buffer*, to memory, and when you want to read from the file, you check if it's in the buffer. If not, read another large chunk into your buffer from the file. This approach minimizes disk reads. Both your operating system and your programming language will make use of caches, however, sometimes [it is necessary to manually buffer your files](https://github.com/JuliaLang/julia/issues/34195).
 
@@ -121,9 +119,9 @@ end
 # On this scale, reading from RAM takes around 100 clock cycles. Similarly to how the slowness of disks can be mitigated by copying data to the faster RAM, data from RAM is copied to a smaller memory chip physically on the CPU, called a *cache*. The cache is faster because it is physically on the CPU chip (reducing wire delays), and because it uses a faster type of RAM, static RAM, instead of the slower (but cheaper to manufacture) dynamic RAM. Because it must be placed on the CPU, limiting its size, and because it is more expensive to produce, a typical CPU cache only contains around $10^8$ bits, around 1000 times less than RAM. There are actually multiple layers of CPU cache, but here we simplify it and just refer to "the cache" as one single thing:
 # 
 # <br>
-# <center><font size=4>
+# <center><font size=5>
 # [CPU] ↔ [CPU CACHE] ↔ [RAM] ↔ [DISK CACHE] ↔ [DISK]
-# </font></center><br>
+# </font></center>
 # 
 # When the CPU requests a piece of data from the RAM, say a single byte, it will first check if the memory is already in cache. If so, it will read from it from there. This is much faster, usually just a few clock cycles, than access to RAM. If not, we have a *cache miss*, and your program will stall for tens of nanoseconds while your computer copies data from RAM into the cache.
 # 
@@ -131,97 +129,83 @@ end
 # 
 # Effective use of the cache comes down to *locality*, temporal and spacial locality:
 # * By *temporal locality*, I mean that data you recently accessed likely resides in cache already. Therefore, if you must access a piece of memory multiple times, make sure you do it close together in time.
-# * By *spacial locality*, I mean that you should access data from memory addresses close to each other. Your CPU does not copy *just* the requested bytes to cache. Instead, your CPU will always copy larger chunk of data (usually 512 consecutive bits).
+# * By *spacial locality*, I mean that you should access data from memory addresses close to each other. Your CPU does not copy *just* the requested bytes to cache. Instead, your CPU will always copy larger chunk of data (usually consecutive 512 bits).
 # 
 # From this information, one can deduce a number of simple tricks to improve performance:
 # * Use as little memory as possible. When your data takes up less memory, it is more likely that your data will be in cache. Remember, a CPU can do approximately 100 small operations in the time wasted by a single cache miss.
 # 
-# * When reading data from RAM, read it sequentially, such that you mostly have the next data you will be using in cache, instead of in a random order. In fact, modern CPUs will detect if you are reading in data sequentially, and *prefetch* upcoming data, that is, fetching the next chunk while the current chunk is being processed, reducing delays caused by cache misses.
+# * When reading data from RAM, read it sequentially, such that you mostly have the next data you will be using in cache, instead of in a random order. In fact, modern CPUs will detect if you are reading in data sequentially, and *prefetch* the data, that is, fetching the next chunk while the current chunk is being processed, reducing delays caused by cache misses.
 # 
-# The following example illustrates two simple functions. The second, `random_access` begins with a random `n`. It then uses the random `n` to access an index in the array, updating `n`. This way, it jumps randomly around the array, sampling a fixed number of elements.
-# 
-# The first function, `linear_access` do the same computation as `random_access`, but uses `i` instead of `n` to  access the array, so it access the data in a linear fashion. Hence, the only difference is the memory access pattern.
-# 
-# Notice the large discrepency in time spent.
+# The following example illustrates two simple functions that iterate over a random array, xor'ing the data. The first function iterates linearly over the array. The second instead uses the current result (which is random) to determine the next index, thus it jumps erratically over the array. On my computer, the second function is *more than 10 times slower* than the first.
 
-function linear_access(data::Vector{UInt})
-    n = rand(UInt)
-    mask = length(data) - 1
-    for i in 1:4096
-        n = (n >>> 7) ⊻ data[i & mask + 1]
+function linear_access(data)
+    x = 0
+    for i in eachindex(data)
+        x ⊻= data[i]
     end
-    return n
+    x
 end
 
-function random_access(data::Vector{UInt})
-    n = rand(UInt)
-    mask = length(data) - 1
-    for i in 1:4096
-        n = (n >>> 7) ⊻ data[n & mask + 1]
+function random_access(data)
+    x = 0
+    for i in eachindex(data)
+        x ⊻= data[x & 0x00000000000fffff + 1]
     end
-    return n
+    x
 end
 
-data = rand(UInt, 2^22);
+data = rand(UInt, 0x00000000000fffff);
 #----------------------------------------------------------------------------
 
 @btime linear_access(data)
-@btime random_access(data);
+@btime random_access(data)
 #----------------------------------------------------------------------------
 
-# This also has implications for your data structures. Hash tables such as `Dict`s and `Set`s are inherently cache inefficient and almost always cause cache misses, whereas arrays don't.
+# This also has implications for your data structures. Hash tables such as `Dict`s and `Set`s are inherently cache inefficient and almost always causes cache misses, whereas arrays don't.
 # 
 # Many of the optimizations in this document indirectly impact cache use, so this is important to have in mind.
 
 # ## Memory alignment<a id='alignment'></a>
 # As just mentioned, your CPU will move 512 consecutive bits (64 bytes) to and from main RAM to cache at a time. These 64 bytes are called a *cache line*. Your entire main memory is segmented into cache lines. For example, memory addresses 0 to 63 is one cache line, addresses 64 to 127 is the next, 128 to 191 the next, et cetera. Your CPU may only request one of these cache lines from memory, and not e.g. the 64 bytes from address 30 to 93.
 # 
-# This means that some data structures can straddle the boundaries between cache lines. If I request a 64-bit (8 byte) integer at adress 60, the CPU must first generate two memory requests from the single requested memory address (namely to get cache lines 0-63 and 64-127), and then retrieve the integer from both cache lines, wasting time.
+# This means that some data structures can straddle the boundaries between cache lines. If I request a 64-bit (8 byte) integer at adress 60, this can cause *two* cache misses, the first to get the 0-63 cache line, and the second to get the 64-127 cache line. Even disregaridng the time-consuming cache misses, the CPU must generate two memory addresses from the single requested memory address, and then retrieve the integer from both cache lines, wasting time.
 # 
-# The time wasted can be significant. In a situation where in-cache memory access proves the bottleneck, the slowdown can approach 2x. In the following example, I use a pointer to repeatedly access an array at a given offset from a cache line boundary. If the offset is in the range `0:56`, the integers all fit within one single cache line, and the function is fast. If the offset is in `57:63` all integers will straddle cache lines.
+# The time wasted can be significant. In a situation where cache misses provides the bottleneck, the slowdown can approach 2x. In the following example, I use a pointer to repeatedly access an array at a given offset from a cache line boundary. If the offset is in the range `0:56`, the integers all fit within one single cache line, and the function is fast. If the offset is in `57:63` all integers will straddle cache lines.
 
 function alignment_test(data::Vector{UInt}, offset::Integer)
-    ## Jump randomly around the memory.
-    n = rand(UInt)
-    mask = (length(data) - 9) ⊻ 7
-    GC.@preserve data begin ## protect the array from moving in memory
-        ptr = pointer(data)
-        iszero(UInt(ptr) & 63) || error("Array not aligned")
-        ptr += (offset & 63)
-        for i in 1:4096
-            n = (n >>> 7) ⊻ unsafe_load(ptr, (n & mask + 1) % Int)
+    n = zero(UInt)
+    mask = length(data) - 8
+    GC.@preserve data begin #### protect the array from moving in memory
+        ptr = pointer(data) + (offset & 63)
+        for i in 1:1024
+            n ⊻= unsafe_load(ptr, (n & mask + 1) % Int)
         end
     end
     return n
 end
-data = rand(UInt, 256 + 8);
+data = rand(UInt, 256);
 #----------------------------------------------------------------------------
 
-@btime alignment_test(data, 0)
-@btime alignment_test(data, 60);
-#----------------------------------------------------------------------------
-
-# In the example above, the short vector easily fit into cache. If we increase the vector size, we will force cache misses. Note that the effect of misalignment is dwarfed by the time wasted on cache misses:
-
-data = rand(UInt, 1 << 22 + 8)
 @btime alignment_test(data, 10)
-@btime alignment_test(data, 60);
+@btime alignment_test(data, 60)
 #----------------------------------------------------------------------------
 
-# Fortunately, the compiler does a few tricks to make it less likely that you will access misaligned data. First, Julia (and other compiled languages) always places new objects in memory at the boundaries of cache lines. When an object is placed right at the boundary, we say that it is *aligned*. Julia also aligns the beginning of larger arrays:
+# The above example is paticularly bad, having a near 2x slowdown.
+# 
+# Fortunately, the compiler does a few tricks to make it less likely that you will access misaligned data. First, Julia (and other compiled languages) always places new objects in memory at the boundaries of cache lines. When an object is placed right at the boundary, we say that it is *aligned*. Julia also aligns the beginning of arrays:
 
 memory_address = reinterpret(UInt, pointer(data))
 @assert iszero(memory_address % 64)
 #----------------------------------------------------------------------------
 
-# Note that if the beginning of an array is aligned, then it's not possible for 1-, 2-, 4-, or 8-byte objects to straddle cache line boundaries, and everything will be aligned.
+# Note that if the beginning of an array is aligned, then it's not possible for 1-, 2-, 4-, or 8-byte integers to straddle cache line boundaries, and everything will be aligned.
 # 
 # It would still be possible for an e.g. 7-byte object to be misaligned in an array. In an array of 7-byte objects, the 10th object would be placed at byte offset $7 \times (10-1) = 63$, and the object would straddle the cache line. However, the compiler usually does not allow struct with a nonstandard size for this reason. If we define a 7-byte struct:
 
 struct AlignmentTest
-    a::UInt32 ## 4 bytes +
-    b::UInt16 ## 2 bytes +
-    c::UInt8  ## 1 byte = 7 bytes?
+    a::UInt32 #### 4 bytes +
+    b::UInt16 #### 2 bytes +
+    c::UInt8  #### 1 byte = 7 bytes?
 end
 #----------------------------------------------------------------------------
 
@@ -254,79 +238,76 @@ get_mem_layout(AlignmentTest)
 # In Julia, we can easily inspect the compiled assembly code using the `code_native` function or the equivalent `@code_native` macro. Let's use the `linear_access` function from earlier:
 
 ## View assembly code generated from this function call
-function foo(x)
-    s = zero(eltype(x))
-    @inbounds for i in eachindex(x)
-        s = x[i ⊻ s]
-    end
-    return s
-end
-
-## Actually running the function will immediately crash Julia, so don't.
-@code_native foo(data)
+@code_native linear_access(data)
 #----------------------------------------------------------------------------
 
-# Let's break it down:
-# 
-# The lines beginning with `;` are comments, and explain which section of the code the following instructions come from. They show the nested series of function calls, and where in the source code they are. You can see that `eachindex`, calls `axes1`, which calls `axes`, which calls `size`. Under the comment line containing the `size` call, we see the first CPU instruction. The instruction name is on the far left, `movq`. The name is composed of two parts, `mov`, the kind of instruction (to move content to or from a register), and a suffix `q`, short for "quad", which means 64-bit integer. There are the following suffixes:  `b` (byte, 8 bit), `w` (word, 16 bit), `l`, (long, 32 bit) and `q` (quad, 64 bit).
-# 
-# The next two columns in the instruction, `24(%rdi)` and `%rax` are the arguments to `movq`. These are the names of the registers (we will return to registers later) where the data to operate on are stored.
-# 
-# You can also see (in the larger display of assembly code) that the code is segmented into sections beginning with a name starting with "L", for example there's a section `L32`. These sections are jumped between using if-statements, or *branches*. Here, section `L32` marks the actual loop. You can see the following two instructions in the `L32` section:
+# Let's break the first 11 lines down:
 # 
 # ```
-# ; ││┌ @ promotion.jl:401 within `=='
-# 	cmpq	$1, %rdi
-# ; │└└
-# 	jne	L32
+# 	.section	__TEXT,__text,regular,pure_instructions
+# ; ┌ @ In[3]:3 within `linear_access'
+# ; │┌ @ abstractarray.jl:212 within `eachindex'
+# ; ││┌ @ abstractarray.jl:95 within `axes1'
+# ; │││┌ @ abstractarray.jl:75 within `axes'
+# ; ││││┌ @ In[3]:2 within `size'
+# 	movq	24(%rsi), %rax
+# ; ││││└
+# ; ││││┌ @ tuple.jl:139 within `map'
+# ; │││││┌ @ range.jl:320 within `OneTo' @ range.jl:311
+# ; ││││││┌ @ promotion.jl:412 within `max'
+# 	testq	%rax, %rax
+# ; │└└└└└└
 # ```
 # 
-# The first instruction `cmpq` (compare quad) compares the data in registry `rdi`, which hold the data for the number of iterations left (plus one), with the number 1, and sets certain flags (wires) in the CPU based on the result. The next instruction `jne` (jump if not equal) makes a jump if the "equal" flag is not set in the CPU, which happens if there is one or more iterations left. You can see it jumps to `L48`, meaning this section repeat.
+# The lines beginning with `;` are comments, and explain which section of the code the following instructions come from. They show the nested series of function calls, and where in the source code they are. You can see that `linear_access` calls `eachindex`, which calls `axes1`, which calls `axes`, which calls `size` and `map`, etc. Under the comment line containing the `size` call, we see the first CPU instruction. The instruction name is on the far left, `movq`. The name is composed of two parts, `mov`, the kind of instruction (to move a single integer of data), and a suffix `q`, short for "quad", which means 64-bit integer. There are the following suffixes:  `b` (byte, 8 bit), `w` (word, 16 bit), `l`, (long, 32 bit) and `q` (quad, 64 bit).
+# 
+# The next two columns in the instruction, `24(%rsi)` and `%rax` are the arguments to `movq`. These are the names of the registrers (we will return to registrers later) where the data to operate on are stored.
+# 
+# You can also see (in the larger display of assembly code) that the code is segmented into sections beginning with a name starting with "L", for example the last section `L131`. These sections are jumped between using if-statements, or *branches*. For example, the actual loop is marked with `L48`. You can see the following two instructions in the `L48` section:
+# 
+# ```
+#     cmpq    %r8, %rcx
+# 	jb      L48
+# ```
+# The first instruction `cmpq` (compare quad) compares the data in the two registrers, which hold the data for the length of the array, and the array index, respectively, and sets certain flags (wires) in the CPU based on the result. The next instruction `jb` (jump if below) makes a jump if the "below" flag is set in the CPU, which happens if the index is lower than the array length. You can see it jumps to `L48`, meaning this section repeat.
 
 # ### Fast instruction, slow instruction
-# Not all CPU instructions are equally fast. Below is a table of selected CPU instructions with *very rough* estimates of how many clock cycles they take to execute. You can find much more detailed tables [in this document](https://www.agner.org/optimize/instruction_tables.pdf). Here, I'll summarize the speed of instructions on modern Intel CPUs. It's very similar for all modern CPUs.
+# Not all CPU instructions are equally fast. Below is a table of selected CPU instructions with *very rough* estimates of how many clock cycles they take to execute.
 # 
-# CPUs instructions typically take multiple CPU cycles to complete. However, if an instruction uses different part of the CPU during its execution, the CPU can usually start a new instruction before the old one is finished: If some operation X takes, say 4 clock cycles, they may queue one or even two operations per clock cycle using a feature called [instruction pipelining](https://en.wikipedia.org/wiki/Instruction_pipelining). Hence, instruction X has a *latency* of 4 cycles, meaning it takes 4 cycles for the instruction to complete. But if the CPU can queue a new instruction every single cycle, it can have a *reciprocal throughput* of 1 clock cycle, meaning *on average*, it only takes 1 cycle per operation.
+# __Fast instructions__ (about 1 clock cycle each)
+# ```
+# and
+# or
+# bitshifts
+# xor
+# add integer
+# subtract integer
+# bitwise invert
+# ```
 # 
-# The following table measures time in clock cycles:
+# __Somewhat fast instructions__
+# ```
+# float addition (3 cycles)
+# multiplication, float or integer (depending on operand size) (5 cycles)
+# ```
 # 
-# |Instruction             |Latency|Rec. throughp.|
-# |------------------------|-------|--------------|
-# |move data               |  1 |  0.25
-# |and/or/xor              |  1 |  0.25
-# |test/compare            |  1 |  0.25
-# |do nothing              |  1 |  0.25
-# |int add/subtract        |  1 |  0.25
-# |bitshift                |  1 |  0.5
-# |float multiplication    |  5 |  0.5
-# |vector int and/or/xor   |  1 |  0.5
-# |vector int add/sub      |  1 |  0.5
-# |vector float add/sub    |  4 |  0.5
-# |vector float multiplic. |  5 |  0.5
-# |lea                     |  3 |  1
-# |int multiplic           |  3 |  1
-# |float add/sub           |  3 |  1
-# |float multiplic.        |  5 |  1
-# |float division          | 15 |  5
-# |vector float division   | 13 |  8
-# |integer division        | 50 | 40
+# __Slow instructions__
+# ```
+# float divison (25 cycles)
+# integer division (30 cycles)
+# ```
 # 
+# __As reference__
+# ```
+# read from cache (1-5 cycles)
+# read to ram (cahche miss) (100 cycles)
+# memory allocation (400 cycles)
+# ```
 # 
-# The `lea` instruction takes three inputs, A, B and C, where A must be 2, 4, or 8, and calculates AB + C. We'll come back to what the "vector" instructions do later.
-# 
-# For comparison, we may also add some *very rough* estimates of other sources of delays:
-# 
-# |Delay                  |Cycles|
-# |-----------------------|----|
-# |move memory from cache |     1
-# |misaligned memory read |    10
-# |cache miss             |   500
-# |read from disk         | 35000
-
-# If you have an inner loop executing millions of times, it may pay off to inspect the generated assembly code for the loop and check if you can express the computation in terms of fast CPU instructions. For example, if you have an integer you know to be 0 or above, and you want to divide it by 8 (discarding any remainder), you can instead do a bitshift, since bitshifts are way faster than integer division:
+# If you have an inner loop executing millions of times, it may pay off to inspect the generated assembly code for the loop and check if you can express the computation in terms of fast CPU instructions. For example, if you have an integer you know to be 0 or above, and you want to divide it by 8 (discarding any remainder), you can instead do a bitshift:
 
 divide_slow(x) = div(x, 8)
-divide_fast(x) = x >>> 3;
+divide_fast(x) = x >>> 3
 #----------------------------------------------------------------------------
 
 # However, modern compilers are pretty clever, and will often figure out the optimal instructions to use in your functions to obtain the same result, by for example replacing an integer divide `idivq` instruction with a bitshift right (`shrq`) where applicable to be faster. You need to check the assembly code yourself to see:
@@ -338,7 +319,7 @@ code_native(divide_slow, (UInt,), debuginfo=:none)
 # ## Allocations and immutability<a id='allocations'></a>
 # As already mentioned, main RAM is much slower than the CPU cache. However, working in main RAM comes with an additional disadvantage: Your operating system (OS) keeps track of which process have access to which memory. If every process had access to all memory, then it would be trivially easy to make a program that scans your RAM for secret data such as bank passwords - or for one program to accidentally overwrite the memory of another program. Instead, every process is allocated a bunch of memory by the OS, and is only allowed to read or write to the allocated data.
 # 
-# The creation of new objects in RAM is termed *allocation*, and the destruction is called *deallocation*. Really, the (de)allocation is not really *creation* or *destruction* per se, but rather the act of starting and stopping keeping track of the memory. Memory that is not kept track of will eventually be overwritten by other data. Allocation and deallocation take a significant amount of time depending on the size of objects, from a few tens to hundreds of nanoseconds per allocation.
+# The creation of new objects in RAM is termed *allocation*, and the destruction is called *deallocation*. Really, the (de)allocation is not really *creation* or *destruction* per se, but rather the act of starting and stopping keeping track of the memory. Memory that is not kept track of will eventually be overwritten by other data. Allocation and deallocation takes a significant amount of time depending on the size of objects, from a few tens to hundreds of nanoseconds per allocation.
 # 
 # In programming languages such as Julia, Python, R and Java, deallocation is automatically done using a program called the *garbage collector* (GC). This program keeps track of which objects are rendered unreachable by the programmer, and deallocates them. For example, if you do:
 
@@ -381,29 +362,22 @@ data = rand(UInt, 2^10);
 # * Third, repeated allocations triggers the GC to run, causing overhead
 # * Fourth, more allocations sometimes means less efficient cache use because you are using more memory
 # 
-# For these reasons, performant code should keep allocations to a minimum. Note that the `@btime` macro prints the number and size of the allocations. This information is given because it is assumed that any programmer who cares to benchmark their code will be interested in reducing allocations.
+# For these reasons, performant code should keep allocations to a minimum. Note that the `@btime` macro prints the number and size of the allocations. This information is given because it is assumed that any programmer who cares to benchmark their code will also be interested in reducing allocations.
 # 
 # ### Not all objects need to be allocated
-# Inside RAM, data is kept on either the *stack* or the *heap*. The stack is a simple data structure with a beginning and end, similar to a `Vector` in Julia. The stack can only be modified by adding or subtracting elements from the end, analogous to a `Vector` with only the two mutating operations `push!` and `pop!`. These operations on the stack are very fast. When we talk about "allocations", however, we talk about data on the heap. Unlike the stack, the heap has an unlimited size (well, it has the size of your computer's RAM), and can be modified arbitrarily, deleting any objects.
+# Inside RAM, data is kept on either the *stack* or the *heap*. The stack is a simple data structure with a beginning and end, similar to a `Vector`. Data from the stack can only be accessed from the end, analogous to a `Vector` with only the two operations `push!` and `pop!`. These operations on the stack are very fast. When we talk about "allocations", however, we talk about data on the heap. Only the heap gives true random access.
 # 
-# Intuitively, it may seem obvious that all objects need to be placed in RAM, must be able to be retrieved and deleted at any time by the program, and therefore need to be allocated on the heap. And for some languages, like Python, this is true. However, this is not true in Julia and other efficient, compiled languages. Integers, for example, can often be placed on the stack.
+# Intuitively, it may seem obvious that all objects need to be placed in RAM, must be able to be retrieved at any time by the program, and therefore need to be allocated on the heap. And for some languages, like Python, this is true. However, this is not true in Julia. Integers, for example, can often be placed on the stack.
 # 
 # Why do some objects need to be heap allocated, while others can be stack allocated? To be stack-allocated, the compiler needs to know for certain that:
 # 
-# * The object is a reasonably small size, so it fits on the stack. This is needed for technical reasons for the stack to operate.
-# * The compiler can predict exactly *when* it needs to add and destroy the object so it can destroy it by simply popping the stack (similar to calling `pop!` on a `Vector`). This is usually the case for local variables in compiled languages.
+# * The object is a fixed, predetermined size, and not too big (max tens of bytes). This is needed for technical reasons for the stack to operate.
+# * That the object never changes. The CPU is free to copy stack-allocated objects, and for immutable objects, there is no way to distinguish a copy from the original. This bears repeating: *With immutable objects, there is no way to distinguish a copy from the original*. This gives the compiler and the CPU certain freedoms when operating on it.
+# * The compiler can predict exactly *when* it needs to access the program so it can reach it by simply popping the stack. This is usually the case in compiled languages.
 # 
-# Julia has even more constrains on stack-allocated objects.
-# * The object should have a fixed size known at compile time.
-# * The compiler must know that object never changes. The CPU is free to copy stack-allocated objects, and for immutable objects, there is no way to distinguish a copy from the original. This bears repeating: *With immutable objects, there is no way to distinguish a copy from the original*. This gives the compiler and the CPU certain freedoms when operating on it.
+# Objects that contain heap-allocated objects have significantly higher overhead in both memory consumption and time spent. In Julia, we have a concept of a *bitstype*, which is an object that recursively contain no heap-allocated objects. Heap allocated objects are objects of types `String`, `Array`, `Ref` and `Symbol`, mutable objects, or objects containing any of the previous. Bitstypes are more performant exactly because they are immutable, fixed in size and can be stack allocated.
 # 
-# In Julia, we have a concept of a *bitstype*, which is an object that recursively contain no heap-allocated objects. Heap allocated objects are objects of types `String`, `Array`, `Ref` and `Symbol`, mutable objects, or objects containing any of the previous. Bitstypes are more performant exactly because they are immutable, fixed in size and can be stack allocated. The latter point is also why objects are immutable by default in Julia, and leads to one other performance tip: Use immutable objects whereever possible.
-# 
-# What does this mean in practise? In Julia, it means if you want fast stack-allocated objects:
-# * You object must be created, used and destroyed in a fully compiled function so the compiler knows for certain when it needs to create, use and destroy the object. If the object is returned for later use (and not immediately returned to another, fully compiled function), we say that the object *escapes*, and must be allocated.
-# * Your object's type must be a bitstype.
-# * Your type must be limited in size. I don't know exactly how large it has to be, but 100 bytes is fine.
-# * The exact memory layout of your type must be known by the compiler.
+# The latter point is also why objects are immutable by default in Julia, and leads to one other performance tip: Use immutable objects whereever possible.
 
 abstract type AllocatedInteger end
 
@@ -454,9 +428,9 @@ println("Data at address ", repr(first_data), ": ",
 # It is time yet again to update our simplified computer schematic. A CPU operates only on data present in *registers*. These are small, fixed size slots (e.g. 8 bytes in size) inside the CPU itself. A register is meant to hold one single piece of data, like an integer or a floating point number. As hinted in the section on assembly code, each instruction usually refers to one or two registers which contain the data the operation works on:
 # 
 # <br>
-# <center><font size=4>
+# <center><font size=5>
 # [CPU] ↔ [REGISTERS] ↔ [CPU CACHE] ↔ [RAM] ↔ [DISK CACHE] ↔ [DISK]
-# </font></center><br>
+# </font></center>
 # 
 # To operate on data structures larger than one register, the data must be broken up into smaller pieces that fits inside the register. For example, when adding two 128-bit integers on my computer:
 
@@ -479,12 +453,10 @@ code_native(+, (typeof(a), typeof(a)), debuginfo=:none)
 
 # Here, two 8\*32 bit vectors are added together in one single instruction. You can see the CPU makes use of a single `vpaddd` (vector packed add double) instruction to add 8 32-bit integers, as well as the corresponding move instruction `vmovdqu`. Note that vector CPU instructions begin with `v`.
 # 
-# It's worth mentioning the interaction between SIMD and alignment: If a series of 256-bit (32-byte) SIMD loads are misaligned, then up to half the loads could cross cache line boundaries, as opposed to just 1/8th of 8-byte loads. Thus, alignment is a much more serious issue when using SIMD. Since array beginnings are always aligned, this is usually not an issue, but in cases where you are not guaranteed to start from an aligned starting point, such as with matrix operations, this may make a significant difference. In brand new CPUs with 512-bit registers, the issues is even worse as the SIMD size is the same as the cache line size, so *all* loads would be misaligned if the initial load is.
-# 
+# ### Automatic vectorization
 # SIMD vectorization of e.g. 64-bit integers may increase throughput by almost 4x, so it is of huge importance in high-performance programming. Compilers will automatically vectorize operations if they can. What can prevent this automatic vectorization?
 # 
-# ### SIMD needs uninterrupted iteration of fixed length
-# Because vectorized operations operates on multiple data at once, it is not possible to interrupt the loop at an arbitrary point. For example, if 4 64-bit integers are processed in one clock cycle, it is not possible to stop a SIMD loop after 3 integers have been processed. Suppose you had a loop like this:
+# Because vectorized operations operates on multiple data at once, it is not possible to interrupt the loop at an arbitrary point. For example, if 4 64-bit integers are processed at a time, it is not possible to stop the loop after 3 integers have been processed. Suppose you had a loop like this:
 # 
 # ```
 # for i in 1:8
@@ -497,11 +469,7 @@ code_native(+, (typeof(a), typeof(a)), debuginfo=:none)
 # 
 # Here, the loop could end on any iteration due to the break statement. Therefore, any SIMD instruction which loaded in multiple integers could operate on data *after* the loop is supposed to break, i.e. data which is never supposed to be read. This would be wrong behaviour, and so, the compiler cannot use SIMD instructions.
 # 
-# A good rule of thumb is that simd needs:
-# * A loop with a predetermined length, so it knows when to stop, and
-# * A loop with no branches (i.e. if-statements) in the loop
-# 
-# In fact, even boundschecking, i.e. checking that you are not indexing outside the bounds of a vector, causes a branch. After all, if the code is supposed to raise a bounds error after 3 iterations, even a single SIMD operation would be wrong! To achieve SIMD vectorization then, all boundschecks must be disabled. We can use this do demonstrate the impact of SIMD:
+# A good rule of thumb is that you should not have any branches (i.e. if-statements) in the loop at all if you want it to SIMD-vectorize. In fact, even boundschecking, i.e. checking that you are not indexing outside the bounds of a vector, causes a branch. After all, if the code is supposed to raise a bounds error after 3 iterations, even a single SIMD operation would be wrong! To achieve SIMD vectorization then, all boundschecks must be disabled. We can use this do demonstrate the impact of SIMD:
 
 function sum_nosimd(x::Vector)
     n = zero(eltype(x))
@@ -525,60 +493,20 @@ data = rand(UInt64, 4096);
 #----------------------------------------------------------------------------
 
 @btime sum_nosimd(data)
-@btime sum_simd(data);
+@btime sum_simd(data)
 #----------------------------------------------------------------------------
 
 # On my computer, the SIMD code is 10x faster than the non-SIMD code. SIMD alone accounts for only about 4x improvements (since we moved from 64-bits per iteration to 256 bits per iteration). The rest of the gain comes from not spending time checking the bounds and from automatic loop unrolling (explained later), which is also made possible by the `@inbounds` annotation.
 # 
-# ### SIMD needs a loop where loop order doesn't matter
-# SIMD can change the order in which elements in an array is processed. If the result of any iteration depends on any previous iteration such that the elements can't be re-ordered, the compiler will usually not SIMD-vectorize. Often when a loop won't auto-vectorize, it's due to subtleties in which data moves around in registers means that there will be some hidden memory dependency between elements in an array.
-# 
-# Imagine we want to sum some 64-bit integers in an array using SIMD. For simplicity, let's say the array has 8 elements, `A`, `B`, `C` ... `H`. In an ordinary non-SIMD loop, the additions would be done like so:
-# 
-# $$(((((((A + B) + C) + D) + E) + F) + G) + H)$$
-# 
-# Whereas when loading the integers using SIMD, four 64-bit integers would be loaded into one vector `<A, B, C, D>`, and the other four into another `<E, F, G, H>`. The two vectors would be added: `<A+E, B+F, C+G, D+H>`. After the loop, the four integers in the resulting vector would be added. So other overall order would be:
-# 
-# $$((((A + E) + (B + F)) + (C + G)) + (D + H))$$
-# 
-# Perhaps surprisingly, addition of floating point numbers can give different results depending on the order (i.e. float addition is not associative):
-
-x = eps(1.0) * 0.4
-1.0 + (x + x) == (1.0 + x) + x
-#----------------------------------------------------------------------------
-
-# for this reason, float addition will not auto-vectorize:
-
-data = rand(Float64, 4096)
-@btime sum_nosimd(data)
-@btime sum_simd(data);
-#----------------------------------------------------------------------------
-
-# However, high-performance programming languages usually provide a command to tell the compiler it's alright to re-order the loop, even for non-associative loops. In Julia, this command is the `@simd` macro:
-
-function sum_simd(x::Vector)
-    n = zero(eltype(x))
-    ## Here we add the `@simd` macro to allow SIMD of floats
-    @inbounds @simd for i in eachindex(x)
-        n += x[i]
-    end
-    return n
-end
-
-data = rand(Float64, 4096)
-@btime sum_nosimd(data)
-@btime sum_simd(data);
-#----------------------------------------------------------------------------
-
-# Julia also provides the macro `@simd ivdep` which further tells the compiler that there are no memory-dependencies in the loop order. However, I *strongly discourage* the use of this macro, unless you *really* know what you're doing. In general, the compiler knows best when a loop has memory dependencies, and misuse of `@simd ivdep` can very easily lead to bugs that are hard to detect.
+# It's worth mentioning the interaction between SIMD and alignment: If a series of 256-bit (32-byte) SIMD loads are misaligned, then up to half the loads could cross cache line boundaries, as opposed to just 1/8th of 8-byte loads. Thus, alignment is a much more serious issue when using SIMD. Since array beginnings are always aligned, this is usually not an issue, but in cases where you are not guaranteed to start from an aligned starting point, such as with matrix operations, this may make a significant difference. In brand new CPUs with 512-bit registers, the issues is even worse as the SIMD size is the same as the cache line size, so *all* loads would be misaligned if the initial load is.
 
 # ## Struct of arrays<a id='soa'></a>
 # If we create an array containing four `AlignmentTest` objects `A`, `B`, `C` and `D`, the objects will lie end to end in the array, like this:
-# 
+#     
 #     Objects: |      A        |       B       |       C       |        D      |
 #     Fields:  |   a   | b |c| |   a   | b |c| |   a   | b |c| |   a   | b |c| |
 #     Byte:     1               9              17              25              33
-# 
+#     
 # Note again that byte no. 8, 16, 24 and 32 are empty to preserve alignment, wasting memory.
 # Now suppose you want to do an operation on all the `.a` fields of the structs. Because the `.a` fields are scattered 8 bytes apart, SIMD operations are much less efficient (loading up to 4 fields at a time) than if all the `.a` fields were stored together (where 8 fields could fit in a 256-bit register). When working with the `.a` fields only, the entire 64-byte cache lines would be read in, of which only half, or 32 bytes would be useful. Not only does this cause more cache misses, we also need instructions to pick out the half of the data from the SIMD registers we need.
 # 
@@ -588,7 +516,7 @@ struct AlignmentTestVector
     a::Vector{UInt32}
     b::Vector{UInt16}
     c::Vector{UInt8}
-end
+end   
 #----------------------------------------------------------------------------
 
 # With the following memory layout for each field:
@@ -597,17 +525,16 @@ end
 #     .a |   A   |   B   |   C   |   D   |
 #     .b | A | B | C | D |
 #     .c |A|B|C|D|
-# 
+#     
 # Alignment is no longer a problem, no space is wasted on padding. When running through all the `a` fields, all cache lines contain full 64 bytes of relevant data, so SIMD operations do not need extra operations to pick out the relevant data:
 
 Base.rand(::Type{AlignmentTest}) = AlignmentTest(rand(UInt32), rand(UInt16), rand(UInt8))
 
-N  = 1_000_000
-array_of_structs = [rand(AlignmentTest) for i in 1:N]
-struct_of_arrays = AlignmentTestVector(rand(UInt32, N), rand(UInt16, N), rand(UInt8, N));
+array_of_structs = [rand(AlignmentTest) for i in 1:1000000]
+struct_of_arrays = AlignmentTestVector(rand(UInt32, 1000000), rand(UInt16, 1000000), rand(UInt8, 1000000));
 
 @btime sum(x -> x.a, array_of_structs)
-@btime sum(struct_of_arrays.a);
+@btime sum(struct_of_arrays.a)
 #----------------------------------------------------------------------------
 
 # ## Specialized CPU instructions<a id='instructions'></a>
@@ -631,9 +558,9 @@ function manual_count_ones(x)
     return n
 end
 
-data = rand(UInt, 10000)
+data = rand(UInt, 10000);
 @btime sum(manual_count_ones, data)
-@btime sum(count_ones, data);
+@btime sum(count_ones, data)
 #----------------------------------------------------------------------------
 
 # The timings you observe here will depend on whether your compiler is clever enough to realize that the computation in the first function can be expressed as a `popcnt` instruction, and thus will be compiled to that. On my computer, the compiler is not able to make that inference, and the second function achieves the same result more than 100x faster.
@@ -647,7 +574,7 @@ data = rand(UInt, 10000)
 const __m128i = NTuple{2, VecElement{Int64}}
 
 ## Define the function in terms of LLVM instructions
-aesenc(a, roundkey) = ccall("llvm.x86.aesni.aesenc", llvmcall, __m128i, (__m128i, __m128i), a, roundkey);
+aesenc(a, roundkey) = ccall("llvm.x86.aesni.aesenc", llvmcall, __m128i, (__m128i, __m128i), a, roundkey)
 #----------------------------------------------------------------------------
 
 # We can verify it works by checking the assembly of the function, which should contain only a single `vaesenc` instruction, as well as the `retq` (return) and the `nopw` (do nothing, used as a filler to align the CPU instructions in memory) instruction:
@@ -684,7 +611,7 @@ code_native(call_plus, (Int,), debuginfo=:none)
 # 
 # Instead, the compiler uses heuristics (rules of thumb) to determine when a function is small enough for inlining to increase performance. These heuristics are not bulletproof, so Julia provides the macros `@noinline`, which prevents inlining of small functions (useful for e.g. functions that raises errors, which must be assumed to be called rarely), and `@inline`, which does not *force* the compiler to inline, but *strongly suggests* to the compiler that it ought to inline the function.
 # 
-# If code contains a time-sensitive section, for example an inner loop, it is important to look at the assembly code to verify that small functions in the loop is inlined. For example, in [this line in my kmer hashing code](https://github.com/jakobnissen/Kash.jl/blob/b9a6e71acf9651d3614f92d5d4b29ffd136bcb5c/src/kmersketch.jl#L41), overall minhashing performance drops by a factor of two if this `@inline` annotation is removed.
+# If code contains a time-sensitive section, for example an inner loop, it is important to look at the assembly code to verify that small functions in the loop are inlined. For example, in [this line in my kmer hashing code](https://github.com/jakobnissen/Kash.jl/blob/b9a6e71acf9651d3614f92d5d4b29ffd136bcb5c/src/kmersketch.jl#L41), overall minhashing performance drops by a factor of two if this `@inline` annotation is removed.
 # 
 # An extreme difference between inlining and no inlining can be demonstrated thus:
 
@@ -697,11 +624,11 @@ function time_function(F, x::AbstractVector)
         n += F(i)
     end
     return n
-end;
+end
 #----------------------------------------------------------------------------
 
 @btime time_function(noninline_poly, data)
-@btime time_function(inline_poly, data);
+@btime time_function(inline_poly, data)
 #----------------------------------------------------------------------------
 
 # ## Unrolling<a id='unrolling'></a>
@@ -741,7 +668,7 @@ end;
 # end
 # ```
 # 
-# The result is obviously the same if we assume the length of the vector is divisible by four. If the length is not divisible by four, we could simply use the function above to sum the first N - rem(N, 4) elements and add the last few elements in another loop. Despite the functionally identical result, the assembly of the loop is different and may look something like:
+# The result is obviously the same if we assume the length of the vector is divisible by four. If the length is not divisible by four, we could simply use the function above to sum the first N - N\%4 elements and add the last few elements in another loop. Despite the functionally identical result, the assembly of the loop is different and may look something like:
 # 
 # ```
 # L1:
@@ -766,8 +693,6 @@ end;
 #         jne L144
 # 
 # Where you can see it is both unrolled by a factor of four, and uses 256-bit SIMD instructions, for a total of 128 bytes, 16 integers added per iteration, or 0.44 instructions per integer.
-# 
-# Notice also that the compiler chooses to use 4 different `ymm` SIMD registers, `ymm0` to `ymm3`, whereas in my example assembly code, I just used one register `rax`. This is because, if you use 4 independent registers, then you don't need to wait for one `vpaddq` to complete (remember, it had a ~3 clock cycle latency) before the CPU can begin the next.
 
 # ## Branch prediction<a id='branches'></a>
 # When a CPU executes instructions, every instruction needs to go through multiple steps, classically the three "fetch", "decode" and "execute" steps, each taking one clock cycle or more. Thus, a CPU instruction must take multiple clock cycles. However, the steps use different circuits of the CPU, and so while one instruction is being executed, another is being decoded and a third is being fetched. This results in much faster throughput, in theory one instruction per cycle.
@@ -785,9 +710,9 @@ end;
 ## Copy all odd numbers from src to dst.
 function copy_odds!(dst::Vector{UInt}, src::Vector{UInt})
     write_index = 1
-    @inbounds for i in eachindex(src) ## <--- this branch is trivially easy to predict
+    @inbounds for i in eachindex(src) #### <--- this branch is trivially easy to predict
         v = src[i]
-        if isodd(v)  ## <--- this is the branch we want to predict
+        if isodd(v)  #### <--- this is the branch we want to predict
             dst[write_index] = v
             write_index += 1
         end
@@ -887,7 +812,7 @@ function parallel_sleep(n_jobs)
     return sum(fetch, jobs)
 end
 
-parallel_sleep(1); ## run once to compile it
+parallel_sleep(1); ##run once to compile it 
 #----------------------------------------------------------------------------
 
 for njobs in (1, 4, 8, 16)
@@ -938,7 +863,7 @@ function julia()
         fill_column!(M, x, real)
     end
     return M
-end;
+end
 #----------------------------------------------------------------------------
 
 @time M = julia();
@@ -965,7 +890,7 @@ function julia()
     M = Matrix{UInt8}(undef, 5000, 5000)
     recursive_fill_columns!(M, 1:5000)
     return M
-end;
+end
 #----------------------------------------------------------------------------
 
 @time M = julia();
